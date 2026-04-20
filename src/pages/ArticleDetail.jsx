@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import { createBitrix24Deal } from '../services/bitrix24';
 
 export default function ArticleDetail() {
   const { id } = useParams();
@@ -49,15 +50,26 @@ export default function ArticleDetail() {
       alert('Это растение уже есть в вашем саду');
       return;
     }
-    const { error } = await supabase.from('plant').insert([{
-      user_id: user.id,
-      name: article.title,
-      variety: null,
-      notes: article.description,
-      is_active: true
-    }]);
-    if (error) alert('Ошибка добавления');
-    else {
+    // Добавляем растение и получаем вставленную запись
+    const { data: newPlant, error } = await supabase
+      .from('plant')
+      .insert([{
+        user_id: user.id,
+        name: article.title,
+        variety: null,
+        notes: article.description,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      }])
+      .select(); // важно: вернёт массив с добавленной записью
+
+    if (error) {
+      alert('Ошибка добавления');
+    } else {
+      // Отправляем данные в Битрикс24
+      if (newPlant && newPlant[0]) {
+        await createBitrix24Deal(newPlant[0]);
+      }
       alert('Растение добавлено в ваш сад');
       navigate('/my-garden');
     }

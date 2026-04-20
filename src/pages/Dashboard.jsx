@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import { createBitrix24Deal } from '../services/bitrix24';
 
 export default function Dashboard() {
   const [plants, setPlants] = useState([]);
@@ -81,7 +82,8 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newPlant.name.trim()) return;
 
-    const { error } = await supabase
+    // 1. Добавляем растение и ЗАПРАШИВАЕМ обратно созданную запись
+    const { data: createdPlant, error } = await supabase
       .from('plant')
       .insert([{
         user_id: user.id,
@@ -90,12 +92,21 @@ export default function Dashboard() {
         planting_date: newPlant.planting_date || null,
         notes: newPlant.notes || null,
         is_active: true
-      }]);
-    if (error) console.error(error);
-    else {
+      }])
+      .select(); // <-- ОЧЕНЬ ВАЖНО: эта команда вернет нам добавленную запись
+
+    if (error) {
+      console.error(error);
+      alert('Ошибка добавления растения');
+    } else {
+      // 2. Используем полученные данные для отправки в CRM
+      if (createdPlant && createdPlant[0]) {
+        await createBitrix24Deal(createdPlant[0]); // <-- Теперь переменная определена
+      }
       setNewPlant({ name: '', variety: '', planting_date: '', notes: '' });
       setShowForm(false);
-      fetchPlants();
+      fetchPlants(); // Обновляем список растений
+      alert('Растение успешно добавлено!');
     }
   };
 
